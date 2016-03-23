@@ -1,0 +1,318 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+	
+		
+	
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Series-View (Hovering, Zooming)</title>
+	<link href="examples2.css" rel="stylesheet" type="text/css">
+	<!--[if lte IE 8]><script language="javascript" type="text/javascript" src="../../excanvas.min.js"></script><![endif]-->
+	<script language="javascript" type="text/javascript" src="./js/jquery.js"></script>
+	<script language="javascript" type="text/javascript" src="./js/jquery.flot.js"></script>
+	<script language="javascript" type="text/javascript" src="./js/jquery.flot.selection.js"></script>
+	<script language="javascript" type="text/javascript" src="./js/jquery.flot.time.js"></script>
+	<script language="javascript" type="text/javascript" src="./js/jquery.flot.axislabels.js"></script>
+	<script language="javascript" type="text/javascript" src="./js/jquery.flot.downsample.js"></script>
+	
+	
+	    	
+				
+   		
+	<script >
+		
+	$(function() {
+		
+		var jsonData = [];
+
+		$.ajax({
+		  url: 'SQL-Query-JSONECHO.php',
+		  async: false,
+		  dataType: 'json',
+		  success: function (json) {
+			  json_TEMP = json[0][0];
+			  json_HUMID = json[0][1];
+			  json_LI = json[0][2];
+			  json_VIBEV = json[0][3];
+			  json_VIBSCO = json[0][4];
+			  //alert(json_HUMID);
+		    }
+		});
+		
+		
+		var sin = [];
+		for (var i = 0; i < 14; i += 0.5) {
+			sin.push([i, Math.sin(i)]);
+		}
+		//alert(sin);
+		
+		var cos = [];
+		for (var i = 0; i < 14; i += 0.5) {
+			cos.push([i, Math.cos(i)]);
+		}
+		
+		var cos2 = [];
+		for (var i = 0; i < 14; i += 2.25) {
+			cos2.push([i, Math.cos(i)]);
+		}
+		
+		var datasets = [ {label: "Temperature", data: json_TEMP}, {label: "Light-Intensity", data: json_LI}, {label: "Humidity", data: json_HUMID},{label: "Vibration Events", data: json_VIBEV}, {label: "Vibration Score", data: json_VIBSCO} ];
+					
+		var options = {
+			legend: {
+				show: true,
+				 noColumns: 0
+			},
+			series: {
+				lines: {
+					show: true
+				},
+				points: {
+					show: true
+				},
+				downsample: {
+				    threshold: 2 // 0 disables downsampling for this series.
+				  }
+			},
+			grid: {
+				hoverable: true,
+				clickable: true
+			},
+		    axisLabels: {
+		               show: true
+		           },
+			yaxes: [ { position: "left" }, {
+				position: "right",
+				alignTicksWithAxis: 1
+				   	 }, {
+				position: "left",
+				   	 }],
+			xaxis: {
+			   mode: "time",
+				//minTickSize: [5, "hours"],
+				//timeformat: "%m/%d %H:%M:%S"				
+			},
+			selection: {
+				mode: "xy"
+			},
+			};
+		
+		// hard-code color indices to prevent them from shifting as
+		// countries are turned on/off
+
+		var i = 0;
+		$.each(datasets, function(key, val) {
+			val.color = i;
+			++i;
+		});
+
+		// insert checkboxes 
+		var choiceContainer = $("#choices");
+		$.each(datasets, function(key, val) {
+			choiceContainer.append("<input type='checkbox' name='" + key +
+				"' checked='checked' id='id" + key + "'></input>" +
+				"<label for='id" + key + "'>"
+				+ val.label + "</label>");
+		});
+
+		choiceContainer.find("input").click(plotAccordingToChoices);
+
+		function plotAccordingToChoices() {
+			
+			var data = [];
+
+			choiceContainer.find("input:checked").each(function () {
+				var key = $(this).attr("name");
+				if (key && datasets[key]) {
+					data.push(datasets[key]);
+				}
+			});
+			
+		if (data.length > 0) {
+			var plot = $.plot("#placeholder", data, options);
+			}
+		}
+		
+		plotAccordingToChoices();		
+		
+		$("<div id='tooltip'></div>").css({
+			position: "absolute",
+			display: "none",
+			border: "1px solid #fdd",
+			padding: "2px",
+			"background-color": "#fee",
+			opacity: 0.80
+		}).appendTo("body");
+
+		$("#placeholder").bind("plothover", function (event, pos, item) {
+		
+
+
+			function timeConverter(UNIX_timestamp){
+			  
+			  var a = new Date(UNIX_timestamp/1);
+			  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+			  var year = a.getFullYear();
+			  var month = months[a.getMonth()];
+			  var date = a.getDate();
+			  //var hour = a.getHours();
+			  var hour = a.getHours() < 10 ? '0' + a.getHours() : a.getHours();
+			  //var min = a.getMinutes();
+			  var min = a.getMinutes() < 10 ? '0' + a.getMinutes() : a.getMinutes();
+			  //var sec = a.getSeconds();
+			  var sec = a.getSeconds() < 10 ? '0' + a.getSeconds() : a.getSeconds();
+			  //var time = date + ',' + month + ' ' + year + ' ' + hour + ':' + min + ':' + sec ;
+			  var time = hour + ':' + min + ':' + sec ;
+			  return time;
+			}
+
+		
+			//if ($("#enablePosition:checked").length > 0) {
+				var str = "(" + timeConverter(pos.x.toFixed(2)) + ", " + pos.y.toFixed(2) + ")";
+				$("#hoverdata").text(str);
+				//}
+
+			//if ($("#enableTooltip:checked").length > 0) {
+				if (item) {
+					var x = item.datapoint[0].toFixed(2),
+						y = item.datapoint[1].toFixed(2);
+
+					$("#tooltip").html(item.series.label + " = " + y)
+						.css({top: item.pageY+5, left: item.pageX+5})
+						.fadeIn(200);
+				} else {
+					$("#tooltip").hide();
+				}
+				//}
+		});
+		
+		choiceContainer.find("input").click(plotAccordingToChoices2);
+		function plotAccordingToChoices2() {
+			
+			var data = [];
+
+			choiceContainer.find("input:checked").each(function () {
+				var key = $(this).attr("name");
+				if (key && datasets[key]) {
+					data.push(datasets[key]);
+				}
+			});
+			
+		if (data.length > 0) {
+			var overview = $.plot("#overview", data, {
+				legend: {
+					show: false
+				},
+				series: {
+					lines: {
+						show: true,
+						lineWidth: 1
+					},
+					shadowSize: 0
+				},
+				xaxis: {
+					mode: "time",
+					//minTickSize: [1, "day"],
+				},
+			   yaxes: { ticks: 0 }, 
+				grid: {
+					color: "#999"
+				},
+				selection: {
+					mode: "xy"
+				}
+			});
+			}
+		}
+		
+		plotAccordingToChoices2();	
+		
+		// now connect the two
+
+		$("#placeholder").bind("plotselected", function (event, ranges) {
+
+			// clamp the zooming to prevent eternal zoom
+
+			if (ranges.xaxis.to - ranges.xaxis.from < 0.00001) {
+				ranges.xaxis.to = ranges.xaxis.from + 0.00001;
+			}
+
+			if (ranges.yaxis.to - ranges.yaxis.from < 0.00001) {
+				ranges.yaxis.to = ranges.yaxis.from + 0.00001;
+			}
+			
+			choiceContainer.find("input").click(plotAccordingToChoices);
+			function plotAccordingToChoices() {
+			
+				var data = [];
+
+				choiceContainer.find("input:checked").each(function () {
+					var key = $(this).attr("name");
+					if (key && datasets[key]) {
+						data.push(datasets[key]);
+					}
+				});
+			
+			plot = $.plot("#placeholder", data,
+				$.extend(true, {}, options, {
+					xaxis: { min: ranges.xaxis.from, max: ranges.xaxis.to },
+					yaxis: { min: ranges.yaxis.from, max: ranges.yaxis.to }
+				})
+			);
+			}
+		
+			plotAccordingToChoices();	
+			
+			
+		// don't fire event on the overview to prevent eternal loop
+
+			overview.setSelection(ranges, true);
+		});
+
+		$("#overview").bind("plotselected", function (event, ranges) {
+			plot.setSelection(ranges);
+		});
+		
+				
+		// Add the Flot version string to the footer
+
+		$("#footer").prepend("Flot " + $.plot.version + " &ndash; ");
+	});
+
+	</script>
+</head>
+<body>
+    	
+	
+	<div id="header">
+		<h2>Animal House Monitor</h2>
+	</div>
+							
+	<div id="content">
+
+		<div class="demo-container">
+					<div id="placeholder" class="demo-placeholder" style="width: 800px;height:400px;margin-top:10px; text-align: left;"></div>
+					<div id="overview" class="demo-placeholder" style="width: 800px;height:100px;margin-top:10px;"></div>
+					</div>
+		<p>
+			<div id="choices" style="float:bottom; width:800px;"></div>
+		</p>	
+		
+		<p>
+			Moving over a data point shows you the exact value.
+			<span id="hoverdata"></span>
+		</p>
+		<br/>							
+		<p>ZOOM IN by selecting a rectangle in the big graph</p>
+		<p>ZOOM OUT by selecting a rectangle in the overview graph at the bottom</p>
+
+		
+				
+	</div>
+
+	<div id="footer">
+		AG Kempermann (CRTD & DZNE)
+	</div>
+
+</body>
+</html>
